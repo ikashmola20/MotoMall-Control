@@ -67,6 +67,31 @@ function requireData<T>(data: T | null, fallback: string): T {
   return data;
 }
 
+function collectUploadedImageUrls(input: {
+  image?: string | null;
+  images?: unknown;
+} | null | undefined): string[] {
+  const urls = new Set<string>();
+
+  if (typeof input?.image === 'string' && input.image.trim()) {
+    urls.add(input.image);
+  }
+
+  if (Array.isArray(input?.images)) {
+    for (const image of input.images) {
+      if (typeof image === 'string' && image.trim()) {
+        urls.add(image);
+      }
+    }
+  }
+
+  return [...urls];
+}
+
+async function deleteUploadedImages(urls: string[]): Promise<void> {
+  await Promise.all(urls.map((url) => deleteUploadedImageByUrl(url)));
+}
+
 export async function loadAdminDashboardSnapshot(
   role: AdminRole,
 ): Promise<AdminDashboardSnapshot> {
@@ -135,6 +160,13 @@ export async function loadAdminDashboardSnapshot(
 
 export async function saveProductRecord(product: Product): Promise<Product> {
   const admin = getAdmin();
+  const existing = await admin
+    .from('products')
+    .select('image, images')
+    .eq('id', product.id)
+    .maybeSingle();
+  ensureNoError(existing.error, 'Failed to load existing product.');
+
   const record = await toProductRecord(admin, product);
   const result = await admin
     .from('products')
@@ -143,13 +175,29 @@ export async function saveProductRecord(product: Product): Promise<Product> {
     .single();
 
   ensureNoError(result.error, 'Failed to save product.');
-  return mapProductRow(requireData(result.data, 'Failed to load saved product.'));
+  const savedProduct = requireData(result.data, 'Failed to load saved product.');
+  const existingUrls = collectUploadedImageUrls(existing.data);
+  const savedUrls = new Set(collectUploadedImageUrls(savedProduct));
+  const removedUrls = existingUrls.filter((url) => !savedUrls.has(url));
+
+  await deleteUploadedImages(removedUrls);
+
+  return mapProductRow(savedProduct);
 }
 
 export async function deleteProductRecord(id: string): Promise<void> {
   const admin = getAdmin();
+  const existing = await admin
+    .from('products')
+    .select('image, images')
+    .eq('id', id)
+    .maybeSingle();
+  ensureNoError(existing.error, 'Failed to load product.');
+
   const { error } = await admin.from('products').delete().eq('id', id);
   ensureNoError(error, 'Failed to delete product.');
+
+  await deleteUploadedImages(collectUploadedImageUrls(existing.data));
 }
 
 export async function saveCategoryRecord(category: Category): Promise<Category> {

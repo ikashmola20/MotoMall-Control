@@ -65,7 +65,10 @@ import {
   updateTeamRole,
 } from '@/lib/supabase/db';
 import { hasSupabaseClientConfig } from '@/lib/supabase/config';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  clearSupabaseBrowserSession,
+  getSupabaseBrowserClient,
+} from '@/lib/supabase/client';
 
 const SESSION_KEY = 'motomall_session';
 
@@ -201,6 +204,19 @@ function getDisplayNameFromMetadata(
   );
 
   return parts.length > 0 ? parts.join(' ') : null;
+}
+
+function isInvalidRefreshTokenError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('invalid refresh token') ||
+    message.includes('refresh token not found') ||
+    message.includes('jwt') && message.includes('expired')
+  );
 }
 
 function buildDailySales(orders: Order[]): DailySales[] {
@@ -381,7 +397,24 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     ) => {
       setLoading(true);
 
-      const authUser = sessionUser ?? (await supabase.auth.getUser()).data.user ?? null;
+      let authUser = sessionUser ?? null;
+
+      if (!authUser) {
+        try {
+          authUser = (await supabase.auth.getUser()).data.user ?? null;
+        } catch (error) {
+          if (isInvalidRefreshTokenError(error)) {
+            await clearSupabaseBrowserSession();
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem(SESSION_KEY);
+            }
+            authUser = null;
+          } else {
+            throw error;
+          }
+        }
+      }
+
       let adminUser: AdminUser | null = null;
 
       if (authUser) {
@@ -483,10 +516,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(SESSION_KEY);
     }
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) {
-      supabase.auth.signOut().catch(() => {});
-    }
+    void clearSupabaseBrowserSession();
   }, []);
 
   const updateOrderStatus = useCallback(

@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdminStore } from '@/lib/admin-store';
 import { Product } from '@/types/admin';
 import { formatIQD } from '@/lib/format';
+import {
+  clearDraft,
+  loadDraft,
+  saveDraft,
+  useBeforeUnloadWarning,
+} from '@/lib/draft';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import SearchInput from '@/components/ui/SearchInput';
@@ -17,8 +23,40 @@ const productImageHints = [
   'يفضل وضع المنتج في المنتصف مع خلفية بيضاء أو شفافة وتجنّب القص القريب.',
 ];
 
+const PRODUCT_DRAFT_KEY = 'motomall:draft:products-form';
+const INITIAL_PRODUCT_FORM = {
+  name: '',
+  brandName: '',
+  categoryId: '',
+  price: '',
+  originalPrice: '',
+  discount: '',
+  description: '',
+  image: '',
+  inStock: true,
+  isNew: false,
+  isBestSeller: false,
+};
+
+type ProductDraft = {
+  showForm: boolean;
+  editingProductId: string | null;
+  form: typeof INITIAL_PRODUCT_FORM;
+  formImages: string[];
+  formSpecTemplateId: string;
+  formSpecs: Record<string, string | number | boolean>;
+};
+
 export default function ProductsPage() {
-  const { products, categories, specTemplates, addProduct, updateProduct, deleteProduct } = useAdminStore();
+  const {
+    products,
+    categories,
+    specTemplates,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    hydrated,
+  } = useAdminStore();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [brandFilter, setBrandFilter] = useState('all');
@@ -34,13 +72,71 @@ export default function ProductsPage() {
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [viewImageIdx, setViewImageIdx] = useState(0);
 
-  const [form, setForm] = useState({
-    name: '', brandName: '', categoryId: '', price: '', originalPrice: '', discount: '',
-    description: '', image: '', inStock: true, isNew: false, isBestSeller: false,
-  });
+  const [form, setForm] = useState(INITIAL_PRODUCT_FORM);
   const [formImages, setFormImages] = useState<string[]>([]);
   const [formSpecTemplateId, setFormSpecTemplateId] = useState('');
   const [formSpecs, setFormSpecs] = useState<Record<string, string | number | boolean>>({});
+  const restoredDraftRef = useRef(false);
+
+  const hasUnsavedFormChanges =
+    showForm &&
+    Boolean(
+      form.name.trim() ||
+        form.brandName.trim() ||
+        form.categoryId ||
+        form.price ||
+        form.originalPrice ||
+        form.discount ||
+        form.description.trim() ||
+        form.image ||
+        formImages.length > 0 ||
+        formSpecTemplateId ||
+        Object.keys(formSpecs).length > 0 ||
+        !form.inStock ||
+        form.isNew ||
+        form.isBestSeller,
+    );
+
+  useBeforeUnloadWarning(hasUnsavedFormChanges);
+
+  useEffect(() => {
+    if (!hydrated || restoredDraftRef.current) {
+      return;
+    }
+
+    const draft = loadDraft<ProductDraft>(PRODUCT_DRAFT_KEY);
+    restoredDraftRef.current = true;
+
+    if (!draft?.showForm) {
+      return;
+    }
+
+    setEditingProduct(
+      draft.editingProductId
+        ? products.find((item) => item.id === draft.editingProductId) ?? null
+        : null,
+    );
+    setForm(draft.form);
+    setFormImages(draft.formImages);
+    setFormSpecTemplateId(draft.formSpecTemplateId);
+    setFormSpecs(draft.formSpecs);
+    setShowForm(true);
+  }, [hydrated, products]);
+
+  useEffect(() => {
+    if (!showForm) {
+      return;
+    }
+
+    saveDraft<ProductDraft>(PRODUCT_DRAFT_KEY, {
+      showForm: true,
+      editingProductId: editingProduct?.id ?? null,
+      form,
+      formImages,
+      formSpecTemplateId,
+      formSpecs,
+    });
+  }, [editingProduct?.id, form, formImages, formSpecTemplateId, formSpecs, showForm]);
 
   const brands = useMemo(() => {
     const map = new Map<string, string>();
@@ -126,9 +222,15 @@ export default function ProductsPage() {
     return specTemplates.find(t => t.id === formSpecTemplateId);
   }, [specTemplates, formSpecTemplateId]);
 
+  const closeForm = () => {
+    clearDraft(PRODUCT_DRAFT_KEY);
+    setEditingProduct(null);
+    setShowForm(false);
+  };
+
   const openAdd = () => {
     setEditingProduct(null);
-    setForm({ name: '', brandName: '', categoryId: '', price: '', originalPrice: '', discount: '', description: '', image: '', inStock: true, isNew: false, isBestSeller: false });
+    setForm(INITIAL_PRODUCT_FORM);
     setFormImages([]);
     setFormSpecTemplateId('');
     setFormSpecs({});
@@ -186,7 +288,7 @@ export default function ProductsPage() {
     } else {
       addProduct(product);
     }
-    setShowForm(false);
+    closeForm();
   };
 
   const viewTemplate = useMemo(() => {
@@ -376,7 +478,7 @@ export default function ProductsPage() {
         <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setCurrentPage} />
       </div>
 
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'} size="xl">
+      <Modal isOpen={showForm} onClose={closeForm} title={editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'} size="xl">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -498,7 +600,7 @@ export default function ProductsPage() {
             <Button onClick={handleSave} disabled={!form.name || !form.price || !form.categoryId}>
               {editingProduct ? 'حفظ التعديلات' : 'إضافة المنتج'}
             </Button>
-            <Button variant="secondary" onClick={() => setShowForm(false)}>إلغاء</Button>
+            <Button variant="secondary" onClick={closeForm}>إلغاء</Button>
           </div>
         </div>
       </Modal>

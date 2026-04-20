@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" fill="none">
+  <rect width="1200" height="800" rx="48" fill="#111827"/>
+  <rect x="72" y="72" width="1056" height="656" rx="36" fill="#1F2937" stroke="#374151" stroke-width="8"/>
+  <circle cx="356" cy="290" r="78" fill="#F59E0B" opacity="0.26"/>
+  <path d="M170 560 380 378l144 124 156-182 184 240H170Z" fill="#374151"/>
+  <path d="M170 560 380 378l144 124 156-182 184 240" stroke="#E5E7EB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="600" y="664" text-anchor="middle" fill="#9CA3AF" font-family="Arial, sans-serif" font-size="44">Media Placeholder</text>
+</svg>

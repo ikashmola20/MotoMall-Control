@@ -1,0 +1,76 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /heroBanners/{bannerId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /admin_orders/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admin_customers/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admin_reviews/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admin_comparisons/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admin_expenses/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admin_specTemplates/{docId} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if isOwner(userId);
+      allow delete: if false;
+
+      match /addresses/{addressId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /orders/{orderId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+  }
+}

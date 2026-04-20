@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" fill="none">
+  <rect width="1200" height="1200" rx="64" fill="#111827"/>
+  <rect x="120" y="120" width="960" height="960" rx="48" fill="#1F2937" stroke="#374151" stroke-width="8"/>
+  <circle cx="360" cy="820" r="86" fill="#0F172A" stroke="#4B5563" stroke-width="18"/>
+  <circle cx="840" cy="820" r="86" fill="#0F172A" stroke="#4B5563" stroke-width="18"/>
+  <path d="M322 736h135l85-182h178c50 0 95 28 119 73l78 147H711" stroke="#E5E7EB" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M487 554 414 444h-88" stroke="#3B82F6" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M716 431h135" stroke="#EF4444" stroke-width="38" stroke-linecap="round"/>
+  <text x="600" y="1010" text-anchor="middle" fill="#9CA3AF" font-family="Arial, sans-serif" font-size="52">MotoMall Product</text>
+</svg>

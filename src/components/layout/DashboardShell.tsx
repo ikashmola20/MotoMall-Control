@@ -17,6 +17,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isBootstrapping = !hydrated || (loading && !currentUser);
 
   useEffect(() => {
     if (hydrated && !loading && !currentUser) {
@@ -36,7 +37,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [currentUser, hydrated, loading, pathname, router]);
 
-  if (!hydrated || loading || !currentUser) {
+  if (isBootstrapping) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg-primary">
         <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -44,8 +45,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     );
   }
 
+  if (!currentUser) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-bg-primary">
+      {loading && (
+        <div className="pointer-events-none fixed left-4 top-4 z-50 rounded-full border border-accent/20 bg-bg-card/90 px-3 py-1.5 text-xs text-text-secondary shadow-lg backdrop-blur">
+          جاري مزامنة البيانات...
+        </div>
+      )}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:mr-64">
         <TopBar

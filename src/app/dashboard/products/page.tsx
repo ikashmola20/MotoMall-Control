@@ -26,6 +26,7 @@ const productImageHints = [
 const PRODUCT_DRAFT_KEY = 'motomall:draft:products-form';
 const INITIAL_PRODUCT_FORM = {
   name: '',
+  brandId: '',
   brandName: '',
   categoryId: '',
   price: '',
@@ -51,6 +52,7 @@ export default function ProductsPage() {
   const {
     products,
     categories,
+    brands: storeBrands,
     specTemplates,
     addProduct,
     updateProduct,
@@ -116,7 +118,7 @@ export default function ProductsPage() {
         ? products.find((item) => item.id === draft.editingProductId) ?? null
         : null,
     );
-    setForm(draft.form);
+    setForm({ ...INITIAL_PRODUCT_FORM, ...draft.form });
     setFormImages(draft.formImages);
     setFormSpecTemplateId(draft.formSpecTemplateId);
     setFormSpecs(draft.formSpecs);
@@ -138,11 +140,29 @@ export default function ProductsPage() {
     });
   }, [editingProduct?.id, form, formImages, formSpecTemplateId, formSpecs, showForm]);
 
-  const brands = useMemo(() => {
+  const productBrands = useMemo(() => {
     const map = new Map<string, string>();
     products.forEach(p => { if (!map.has(p.brandId)) map.set(p.brandId, p.brandName); });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [products]);
+
+  const selectableBrands = useMemo(() => {
+    const map = new Map<string, string>();
+
+    storeBrands
+      .filter((brand) => brand.isActive !== false)
+      .forEach((brand) => map.set(brand.id, brand.name));
+
+    productBrands.forEach((brand) => {
+      if (!map.has(brand.id)) {
+        map.set(brand.id, brand.name);
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [productBrands, storeBrands]);
 
   const filtered = useMemo(() => {
     return products.filter(p => {
@@ -240,7 +260,7 @@ export default function ProductsPage() {
   const openEdit = (p: Product) => {
     setEditingProduct(p);
     setForm({
-      name: p.name, brandName: p.brandName, categoryId: p.categoryId,
+      name: p.name, brandId: p.brandId, brandName: p.brandName, categoryId: p.categoryId,
       price: p.price.toString(), originalPrice: p.originalPrice?.toString() || '', discount: p.discount?.toString() || '',
       description: p.description || '', image: p.image, inStock: p.inStock, isNew: p.isNew, isBestSeller: p.isBestSeller,
     });
@@ -259,11 +279,12 @@ export default function ProductsPage() {
       formSpecTemplateId && Object.keys(formSpecs).length > 0 ? formSpecs : undefined;
 
     const now = new Date().toISOString();
+    const selectedBrand = selectableBrands.find((brand) => brand.id === form.brandId);
     const product: Product = {
       id: editingProduct?.id || `prod-${Date.now()}`,
       name: form.name,
-      brandId: editingProduct?.brandId || `brand-${Date.now()}`,
-      brandName: form.brandName,
+      brandId: selectedBrand?.id || form.brandId,
+      brandName: selectedBrand?.name || form.brandName,
       categoryId: form.categoryId,
       categoryName: categories.find(c => c.id === form.categoryId)?.name || '',
       specTemplateId: formSpecTemplateId || undefined,
@@ -316,7 +337,7 @@ export default function ProductsPage() {
             <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)}
               className="appearance-none bg-bg-secondary border border-border rounded-xl px-4 py-2.5 pl-8 text-sm text-text-primary focus:outline-none focus:border-accent transition-colors">
               <option value="all">جميع البراندات</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {selectableBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
             <ChevronDown className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
           </div>
@@ -488,8 +509,25 @@ export default function ProductsPage() {
             </div>
             <div>
               <label className="block text-sm text-text-secondary mb-1">البراند *</label>
-              <input type="text" value={form.brandName} onChange={e => setForm({ ...form, brandName: e.target.value })}
-                className="w-full bg-bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent" />
+              <select
+                value={form.brandId}
+                onChange={e => {
+                  const selectedBrand = selectableBrands.find((brand) => brand.id === e.target.value);
+                  setForm({
+                    ...form,
+                    brandId: selectedBrand?.id || '',
+                    brandName: selectedBrand?.name || '',
+                  });
+                }}
+                className="w-full bg-bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent"
+              >
+                <option value="">اختر البراند</option>
+                {selectableBrands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm text-text-secondary mb-1">القسم *</label>
@@ -597,7 +635,7 @@ export default function ProductsPage() {
           )}
 
           <div className="flex gap-3 pt-2">
-            <Button onClick={handleSave} disabled={!form.name || !form.price || !form.categoryId}>
+            <Button onClick={handleSave} disabled={!form.name || !form.brandId || !form.price || !form.categoryId}>
               {editingProduct ? 'حفظ التعديلات' : 'إضافة المنتج'}
             </Button>
             <Button variant="secondary" onClick={closeForm}>إلغاء</Button>

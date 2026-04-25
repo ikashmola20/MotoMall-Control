@@ -239,21 +239,12 @@ export default function BannersPage() {
                           </span>
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                              positionMeta.size === 'large'
-                                ? 'bg-accent text-white'
-                                : 'bg-white/18 text-white/90'
-                            }`}
-                          >
-                            {positionMeta.size === 'large' ? 'بانر رئيسي' : 'بانر جانبي'}
-                          </span>
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
                               banner.isActive
                                 ? 'bg-success/20 text-white'
                                 : 'bg-danger/25 text-white'
                             }`}
                           >
-                            {banner.isActive ? 'نشط' : 'معطل'}
+                            {banner.isActive ? 'ظاهر في المتجر' : 'مخفي عن المتجر'}
                           </span>
                         </div>
 

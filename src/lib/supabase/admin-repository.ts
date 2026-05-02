@@ -144,7 +144,13 @@ export async function loadAdminDashboardSnapshot(
   return {
     products: (productsResult.data ?? []).map(mapProductRow),
     categories: (categoriesResult.data ?? []).map(mapCategoryRow),
-    brands: (brandsResult.data ?? []).map(mapBrandRow),
+    brands: (brandsResult.data ?? [])
+      .map(mapBrandRow)
+      .sort(
+        (left, right) =>
+          (left.sortOrder ?? 0) - (right.sortOrder ?? 0) ||
+          left.name.localeCompare(right.name),
+      ),
     orders: (ordersResult.data ?? []).map(mapOrderRow),
     customers: (customersResult.data ?? []).map(mapCustomerRow),
     reviews: (reviewsResult.data ?? []).map(mapReviewRow),

@@ -153,6 +153,7 @@ export function toBrandRecord(brand: Brand): Tables['brands']['Insert'] {
     logo: brand.logo ?? null,
     country: brand.country ?? null,
     is_active: brand.isActive ?? true,
+    sort_order: brand.sortOrder ?? 0,
   };
 }
 

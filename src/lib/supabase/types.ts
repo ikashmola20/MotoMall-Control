@@ -196,6 +196,7 @@ export interface Database {
           logo: string | null;
           country: string | null;
           is_active: boolean;
+          sort_order: number;
           created_at: Timestamp;
           updated_at: Timestamp;
         };
@@ -206,6 +207,7 @@ export interface Database {
           logo?: string | null;
           country?: string | null;
           is_active?: boolean;
+          sort_order?: number;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         };
@@ -215,6 +217,7 @@ export interface Database {
           logo?: string | null;
           country?: string | null;
           is_active?: boolean;
+          sort_order?: number;
           updated_at?: Timestamp;
         };
         Relationships: [];

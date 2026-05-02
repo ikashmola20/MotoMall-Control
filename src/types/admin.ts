@@ -100,6 +100,7 @@ export interface Brand {
   logo?: string;
   country?: string;
   isActive: boolean;
+  sortOrder?: number;
 }
 
 // ── Orders (Unified) ────────────────────────

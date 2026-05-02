@@ -6,7 +6,7 @@ import { Brand } from '@/types/admin';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import ImageUpload from '@/components/ui/ImageUpload';
-import { Plus, Edit3, Trash2, Globe } from 'lucide-react';
+import { Plus, Edit3, Trash2, Globe, ArrowUp, ArrowDown } from 'lucide-react';
 
 const brandLogoHints = [
   'الأفضل: 512x512 بكسل.',
@@ -14,13 +14,30 @@ const brandLogoHints = [
   'يفضل PNG أو SVG بخلفية شفافة مع هامش بسيط حول الشعار.',
 ];
 
+function normalizeBrandSlug(value: string, fallback: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || fallback;
+}
+
 export default function BrandsPage() {
   const { brands, products, addBrand, updateBrand, deleteBrand } = useAdminStore();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Brand | null>(null);
   const [form, setForm] = useState({ name: '', slug: '', logo: '', country: '', isActive: true });
 
-  const brandsWithCount = brands.map(b => ({
+  const orderedBrands = brands
+    .map((brand, index) => ({
+      ...brand,
+      sortOrder: brand.sortOrder && brand.sortOrder > 0 ? brand.sortOrder : index + 1,
+    }))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+
+  const brandsWithCount = orderedBrands.map(b => ({
     ...b,
     productCount: products.filter(p => p.brandId === b.id).length,
   }));
@@ -38,17 +55,33 @@ export default function BrandsPage() {
   };
 
   const handleSave = () => {
+    const id = editing?.id || `brand-${Date.now()}`;
     const brand: Brand = {
-      id: editing?.id || `brand-${Date.now()}`,
+      id,
       name: form.name,
-      slug: form.slug || form.name.toLowerCase().replace(/\s+/g, '-'),
+      slug: normalizeBrandSlug(form.slug || form.name, id),
       logo: form.logo || undefined,
       country: form.country || undefined,
       isActive: form.isActive,
+      sortOrder: editing?.sortOrder ?? orderedBrands.length + 1,
     };
     if (editing) updateBrand(brand);
     else addBrand(brand);
     setShowForm(false);
+  };
+
+  const moveBrand = (brandId: string, direction: 'up' | 'down') => {
+    const currentIndex = orderedBrands.findIndex((brand) => brand.id === brandId);
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedBrands.length) {
+      return;
+    }
+
+    const current = orderedBrands[currentIndex];
+    const target = orderedBrands[targetIndex];
+    updateBrand({ ...current, sortOrder: target.sortOrder });
+    updateBrand({ ...target, sortOrder: current.sortOrder });
   };
 
   return (
@@ -68,11 +101,12 @@ export default function BrandsPage() {
                   <th className="text-right py-3 px-4 text-text-secondary font-medium">البلد</th>
                   <th className="text-right py-3 px-4 text-text-secondary font-medium">المنتجات</th>
                   <th className="text-right py-3 px-4 text-text-secondary font-medium">الحالة</th>
-                  <th className="text-right py-3 px-4 text-text-secondary font-medium w-24">إجراءات</th>
+                  <th className="text-right py-3 px-4 text-text-secondary font-medium">الترتيب</th>
+                  <th className="text-right py-3 px-4 text-text-secondary font-medium w-28">إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {brandsWithCount.map(brand => (
+                {brandsWithCount.map((brand, index) => (
                   <tr key={brand.id} className="border-b border-border/50 hover:bg-bg-secondary/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
@@ -100,6 +134,27 @@ export default function BrandsPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => moveBrand(brand.id, 'up')}
+                          disabled={index === 0}
+                          title="رفع البراند: يظهر أقرب لليمين في الموقع"
+                          className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => moveBrand(brand.id, 'down')}
+                          disabled={index === brandsWithCount.length - 1}
+                          title="خفض البراند: يظهر أقرب لليسار في الموقع"
+                          className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        <span className="mr-2 text-xs text-text-muted font-inter">#{index + 1}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1">
                         <button onClick={() => openEdit(brand)} className="p-1.5 rounded-lg text-text-muted hover:text-warning hover:bg-warning/10 transition-colors">
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -111,7 +166,7 @@ export default function BrandsPage() {
                   </tr>
                 ))}
                 {brandsWithCount.length === 0 && (
-                  <tr><td colSpan={5} className="py-8 text-center text-text-muted">لا توجد براندات مضافة</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-text-muted">لا توجد براندات مضافة</td></tr>
                 )}
               </tbody>
             </table>

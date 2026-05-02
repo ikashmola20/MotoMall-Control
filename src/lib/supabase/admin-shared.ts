@@ -214,6 +214,7 @@ export function mapBrandRow(row: Tables['brands']['Row']) {
     logo: normalizeMediaUrl(row.logo, PLACEHOLDER_MEDIA.brand),
     country: row.country ?? undefined,
     isActive: row.is_active,
+    sortOrder: row.sort_order ?? 0,
   };
 }
 

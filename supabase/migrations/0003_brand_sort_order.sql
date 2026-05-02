@@ -15,3 +15,5 @@ where brands.id = ranked_brands.id
 
 create index if not exists brands_sort_order_idx
   on public.brands(sort_order asc, name asc);
+
+notify pgrst, 'reload schema';

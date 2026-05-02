@@ -92,6 +92,12 @@ async function deleteUploadedImages(urls: string[]): Promise<void> {
   await Promise.all(urls.map((url) => deleteUploadedImageByUrl(url)));
 }
 
+function isMissingBrandSortOrderError(
+  error: { message?: string | null } | null,
+): boolean {
+  return Boolean(error?.message?.includes('sort_order'));
+}
+
 export async function loadAdminDashboardSnapshot(
   role: AdminRole,
 ): Promise<AdminDashboardSnapshot> {
@@ -232,6 +238,12 @@ export async function saveBrandRecord(brand: Brand): Promise<Brand> {
     .upsert(toBrandRecord(brand), { onConflict: 'id' })
     .select('*')
     .single();
+
+  if (isMissingBrandSortOrderError(result.error)) {
+    throw new Error(
+      'ترتيب البراندات يحتاج تفعيل عمود sort_order في Supabase أولاً. افتح SQL Editor ونفّذ ملف supabase/migrations/0003_brand_sort_order.sql ثم حدّث الصفحة.',
+    );
+  }
 
   ensureNoError(result.error, 'Failed to save brand.');
   return mapBrandRow(requireData(result.data, 'Failed to load saved brand.'));

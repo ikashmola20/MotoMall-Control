@@ -4,6 +4,14 @@ import type {
   AdminUser,
   Category,
   Customer,
+  CustomerCrmStatus,
+  CustomerInteraction,
+  CustomerInteractionType,
+  CustomerNote,
+  CustomerTag,
+  CustomerTask,
+  CustomerTaskPriority,
+  CustomerTaskStatus,
   HeroBanner,
   Order,
   Product,
@@ -260,6 +268,40 @@ export function mapOrderRow(row: Tables['admin_orders']['Row']): Order {
   };
 }
 
+function asCustomerCrmStatus(value: string | null | undefined): CustomerCrmStatus {
+  return value === 'active' ||
+    value === 'vip' ||
+    value === 'at_risk' ||
+    value === 'inactive'
+    ? value
+    : 'new';
+}
+
+function asCustomerTaskStatus(value: string | null | undefined): CustomerTaskStatus {
+  return value === 'in_progress' || value === 'done' || value === 'cancelled'
+    ? value
+    : 'open';
+}
+
+function asCustomerTaskPriority(
+  value: string | null | undefined,
+): CustomerTaskPriority {
+  return value === 'low' || value === 'high' || value === 'urgent'
+    ? value
+    : 'medium';
+}
+
+function asCustomerInteractionType(
+  value: string | null | undefined,
+): CustomerInteractionType {
+  return value === 'call' ||
+    value === 'whatsapp' ||
+    value === 'visit' ||
+    value === 'email'
+    ? value
+    : 'note';
+}
+
 export function mapCustomerRow(row: Tables['admin_customers']['Row']): Customer {
   return {
     id: row.id,
@@ -273,6 +315,78 @@ export function mapCustomerRow(row: Tables['admin_customers']['Row']): Customer 
     createdAt: toIso(row.created_at),
     isActive: row.is_active,
     lastOrderAt: row.last_order_at ?? undefined,
+    updatedAt: toIso(row.updated_at),
+    crmStatus: asCustomerCrmStatus(row.crm_status),
+    assignedTo: row.assigned_to ?? undefined,
+    lastContactAt: row.last_contact_at ?? undefined,
+    nextFollowUpAt: row.next_follow_up_at ?? undefined,
+    internalRating: row.internal_rating ?? 0,
+    tags: [],
+    notes: [],
+    tasks: [],
+    interactions: [],
+  };
+}
+
+export function mapCustomerNoteRow(
+  row: Tables['admin_customer_notes']['Row'],
+): CustomerNote {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    body: row.body,
+    createdBy: row.created_by ?? undefined,
+    authorName: row.author_name ?? undefined,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+export function mapCustomerTaskRow(
+  row: Tables['admin_customer_tasks']['Row'],
+): CustomerTask {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    title: row.title,
+    description: row.description ?? undefined,
+    dueAt: row.due_at ?? undefined,
+    status: asCustomerTaskStatus(row.status),
+    priority: asCustomerTaskPriority(row.priority),
+    assignedTo: row.assigned_to ?? undefined,
+    assignedName: row.assigned_name ?? undefined,
+    createdBy: row.created_by ?? undefined,
+    createdByName: row.created_by_name ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+export function mapCustomerTagRow(
+  row: Tables['admin_customer_tags']['Row'],
+): CustomerTag {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+export function mapCustomerInteractionRow(
+  row: Tables['admin_customer_interactions']['Row'],
+): CustomerInteraction {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    type: asCustomerInteractionType(row.type),
+    summary: row.summary,
+    occurredAt: toIso(row.occurred_at),
+    createdBy: row.created_by ?? undefined,
+    createdByName: row.created_by_name ?? undefined,
+    createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
 }

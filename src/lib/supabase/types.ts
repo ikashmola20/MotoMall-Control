@@ -523,6 +523,11 @@ export interface Database {
           total_spent: number;
           is_active: boolean;
           last_order_at: Timestamp | null;
+          crm_status: string;
+          assigned_to: string | null;
+          last_contact_at: Timestamp | null;
+          next_follow_up_at: Timestamp | null;
+          internal_rating: number;
           created_at: Timestamp;
           updated_at: Timestamp;
         };
@@ -536,6 +541,11 @@ export interface Database {
           total_spent?: number;
           is_active?: boolean;
           last_order_at?: Timestamp | null;
+          crm_status?: string;
+          assigned_to?: string | null;
+          last_contact_at?: Timestamp | null;
+          next_follow_up_at?: Timestamp | null;
+          internal_rating?: number;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         };
@@ -548,6 +558,156 @@ export interface Database {
           total_spent?: number;
           is_active?: boolean;
           last_order_at?: Timestamp | null;
+          crm_status?: string;
+          assigned_to?: string | null;
+          last_contact_at?: Timestamp | null;
+          next_follow_up_at?: Timestamp | null;
+          internal_rating?: number;
+          updated_at?: Timestamp;
+        };
+        Relationships: [];
+      };
+      admin_customer_notes: {
+        Row: {
+          id: string;
+          customer_id: string;
+          body: string;
+          created_by: string | null;
+          author_name: string | null;
+          created_at: Timestamp;
+          updated_at: Timestamp;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          body: string;
+          created_by?: string | null;
+          author_name?: string | null;
+          created_at?: Timestamp;
+          updated_at?: Timestamp;
+        };
+        Update: {
+          body?: string;
+          created_by?: string | null;
+          author_name?: string | null;
+          updated_at?: Timestamp;
+        };
+        Relationships: [];
+      };
+      admin_customer_tasks: {
+        Row: {
+          id: string;
+          customer_id: string;
+          title: string;
+          description: string | null;
+          due_at: Timestamp | null;
+          status: string;
+          priority: string;
+          assigned_to: string | null;
+          assigned_name: string | null;
+          created_by: string | null;
+          created_by_name: string | null;
+          completed_at: Timestamp | null;
+          created_at: Timestamp;
+          updated_at: Timestamp;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          title: string;
+          description?: string | null;
+          due_at?: Timestamp | null;
+          status?: string;
+          priority?: string;
+          assigned_to?: string | null;
+          assigned_name?: string | null;
+          created_by?: string | null;
+          created_by_name?: string | null;
+          completed_at?: Timestamp | null;
+          created_at?: Timestamp;
+          updated_at?: Timestamp;
+        };
+        Update: {
+          title?: string;
+          description?: string | null;
+          due_at?: Timestamp | null;
+          status?: string;
+          priority?: string;
+          assigned_to?: string | null;
+          assigned_name?: string | null;
+          completed_at?: Timestamp | null;
+          updated_at?: Timestamp;
+        };
+        Relationships: [];
+      };
+      admin_customer_tags: {
+        Row: {
+          id: string;
+          name: string;
+          color: string;
+          created_by: string | null;
+          created_at: Timestamp;
+          updated_at: Timestamp;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          color?: string;
+          created_by?: string | null;
+          created_at?: Timestamp;
+          updated_at?: Timestamp;
+        };
+        Update: {
+          name?: string;
+          color?: string;
+          updated_at?: Timestamp;
+        };
+        Relationships: [];
+      };
+      admin_customer_tag_links: {
+        Row: {
+          customer_id: string;
+          tag_id: string;
+          created_at: Timestamp;
+        };
+        Insert: {
+          customer_id: string;
+          tag_id: string;
+          created_at?: Timestamp;
+        };
+        Update: {
+          customer_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [];
+      };
+      admin_customer_interactions: {
+        Row: {
+          id: string;
+          customer_id: string;
+          type: string;
+          summary: string;
+          occurred_at: Timestamp;
+          created_by: string | null;
+          created_by_name: string | null;
+          created_at: Timestamp;
+          updated_at: Timestamp;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          type?: string;
+          summary: string;
+          occurred_at?: Timestamp;
+          created_by?: string | null;
+          created_by_name?: string | null;
+          created_at?: Timestamp;
+          updated_at?: Timestamp;
+        };
+        Update: {
+          type?: string;
+          summary?: string;
+          occurred_at?: Timestamp;
           updated_at?: Timestamp;
         };
         Relationships: [];

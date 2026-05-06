@@ -65,7 +65,25 @@ The admin must target these exact tables:
 - checks `profiles.role` before privileged actions
 - allows only `admin` and `employee` users to log in
 - mirrors `admin_orders` changes to `user_orders` when `user_id` exists
+- adds an isolated admin CRM layer for customer follow-up without changing storefront UI
 - keeps reports and expenses isolated so the storefront schema is not polluted
+
+## Admin CRM Migration
+
+The Control CRM uses the shared `admin_customers` records and adds admin-only CRM tables for notes, tasks, tags, and internal contact history. Apply this migration on the shared Supabase database before using the CRM tools:
+
+- `D:\1 Projects\Motomall opus 4.6 Control\supabase\migrations\0004_customer_crm.sql`
+
+It adds:
+
+- CRM fields on `admin_customers`: `crm_status`, `assigned_to`, `last_contact_at`, `next_follow_up_at`, `internal_rating`
+- `admin_customer_notes`
+- `admin_customer_tasks`
+- `admin_customer_tags`
+- `admin_customer_tag_links`
+- `admin_customer_interactions`
+
+These tables are admin-only operational data. They do not replace storefront customer/account tables and should be written only through secure admin route handlers.
 
 ## Roles Migration
 
@@ -96,6 +114,7 @@ Read these first:
 - supabase/migrations/0001_schema.sql
 - supabase/migrations/0002_rls.sql
 - supabase/migrations/0003_profiles_role.sql
+- Control CRM migration: supabase/migrations/0004_customer_crm.sql
 - src/lib/supabase/*.ts
 - src/lib/orders.ts
 - src/types/index.ts
@@ -130,6 +149,7 @@ Important constraints:
 - privileged writes must go through secure server routes or server actions with service_role
 - verify the logged-in user and profiles.role in every privileged path
 - only admin can change team roles
+- CRM notes/tasks/tags/interactions must use admin-only route handlers and service_role
 - keep the existing mock fallback if Supabase config is missing
 - preserve Arabic RTL UI and current design
 - do not reintroduce Firebase

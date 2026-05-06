@@ -6,6 +6,7 @@ import type {
   Brand,
   Category,
   Comparison,
+  Customer,
   HeroBanner,
   Order,
   Product,
@@ -14,7 +15,10 @@ import type {
   SiteSettings,
   SpecTemplate,
 } from '@/types/admin';
-import type { AdminDashboardSnapshot } from '@/lib/admin-contract';
+import type {
+  AdminDashboardSnapshot,
+  CustomerCrmMutation,
+} from '@/lib/admin-contract';
 import { getSupabaseAdminClient } from './admin';
 import {
   ensureAdminStillExists,
@@ -37,7 +41,11 @@ import {
   mapBrandRow,
   mapCategoryRow,
   mapComparisonRow,
+  mapCustomerInteractionRow,
+  mapCustomerNoteRow,
   mapCustomerRow,
+  mapCustomerTagRow,
+  mapCustomerTaskRow,
   mapHeroBannerRow,
   mapOrderRow,
   mapProductRow,
@@ -47,7 +55,9 @@ import {
 } from './admin-shared';
 import { deleteUploadedImageByUrl } from './storage';
 import { defaultSettings } from '@/data/mock-admin';
+import type { Database } from './types';
 
+type Tables = Database['public']['Tables'];
 type AdminClient = NonNullable<ReturnType<typeof getSupabaseAdminClient>>;
 
 function getAdmin(): AdminClient {
@@ -98,6 +108,196 @@ function isMissingBrandSortOrderError(
   return Boolean(error?.message?.includes('sort_order'));
 }
 
+function isMissingCrmSchemaError(
+  error: { message?: string | null; code?: string | null } | null,
+): boolean {
+  const message = error?.message?.toLowerCase() ?? '';
+  return (
+    error?.code === 'PGRST204' ||
+    error?.code === 'PGRST205' ||
+    message.includes('admin_customer_') ||
+    message.includes('crm_status') ||
+    message.includes('next_follow_up_at') ||
+    message.includes('internal_rating') ||
+    message.includes('schema cache') ||
+    message.includes('relation') && message.includes('does not exist')
+  );
+}
+
+function ensureCrmSchema(error: { message?: string | null; code?: string | null } | null): void {
+  if (!error) {
+    return;
+  }
+
+  if (isMissingCrmSchemaError(error)) {
+    throw new Error(
+      'منظومة CRM تحتاج تفعيل جداولها في Supabase أولاً. افتح SQL Editor ونفّذ ملف supabase/migrations/0004_customer_crm.sql ثم حدّث الصفحة.',
+    );
+  }
+
+  ensureNoError(error, 'Failed to update customer CRM.');
+}
+
+async function optionalCrmRows<T>(
+  resultPromise: PromiseLike<{ data: T[] | null; error: { message?: string | null; code?: string | null } | null }>,
+): Promise<T[]> {
+  const result = await resultPromise;
+  if (result.error) {
+    if (isMissingCrmSchemaError(result.error)) {
+      return [];
+    }
+
+    ensureNoError(result.error, 'Failed to load customer CRM data.');
+  }
+
+  return result.data ?? [];
+}
+
+function buildStaffName(row: {
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+}): string {
+  const fullName = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim();
+  return fullName || row.email || 'MotoMall Admin';
+}
+
+function getActorName(actor: { profile: Tables['profiles']['Row']; user: { email?: string | null } }): string {
+  return buildStaffName({
+    first_name: actor.profile.first_name,
+    last_name: actor.profile.last_name,
+    email: actor.profile.email ?? actor.user.email ?? null,
+  });
+}
+
+async function getStaffNameById(
+  admin: AdminClient,
+  userId: string | null | undefined,
+): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
+
+  const result = await admin
+    .from('profiles')
+    .select('first_name, last_name, email')
+    .eq('id', userId)
+    .maybeSingle();
+
+  ensureNoError(result.error, 'Failed to load assigned staff profile.');
+  return result.data ? buildStaffName(result.data) : null;
+}
+
+function groupByCustomer<T extends { customerId: string }>(items: T[]): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const item of items) {
+    const list = grouped.get(item.customerId) ?? [];
+    list.push(item);
+    grouped.set(item.customerId, list);
+  }
+  return grouped;
+}
+
+async function attachCustomerCrmData(
+  admin: AdminClient,
+  customers: Customer[],
+  teamMembers: AdminUser[],
+): Promise<Customer[]> {
+  if (customers.length === 0) {
+    return customers;
+  }
+
+  const [noteRows, taskRows, tagRows, tagLinkRows, interactionRows] =
+    await Promise.all([
+      optionalCrmRows(
+        admin
+          .from('admin_customer_notes')
+          .select('*')
+          .order('created_at', { ascending: false }),
+      ),
+      optionalCrmRows(
+        admin
+          .from('admin_customer_tasks')
+          .select('*')
+          .order('due_at', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: false }),
+      ),
+      optionalCrmRows(
+        admin
+          .from('admin_customer_tags')
+          .select('*')
+          .order('name', { ascending: true }),
+      ),
+      optionalCrmRows(admin.from('admin_customer_tag_links').select('*')),
+      optionalCrmRows(
+        admin
+          .from('admin_customer_interactions')
+          .select('*')
+          .order('occurred_at', { ascending: false }),
+      ),
+    ]);
+
+  const notesByCustomer = groupByCustomer(noteRows.map(mapCustomerNoteRow));
+  const tasksByCustomer = groupByCustomer(taskRows.map(mapCustomerTaskRow));
+  const interactionsByCustomer = groupByCustomer(
+    interactionRows.map(mapCustomerInteractionRow),
+  );
+  const tagsById = new Map(tagRows.map((row) => [row.id, mapCustomerTagRow(row)]));
+  const tagIdsByCustomer = new Map<string, string[]>();
+
+  for (const link of tagLinkRows) {
+    const list = tagIdsByCustomer.get(link.customer_id) ?? [];
+    list.push(link.tag_id);
+    tagIdsByCustomer.set(link.customer_id, list);
+  }
+
+  const staffNames = new Map(teamMembers.map((member) => [member.id, member.name]));
+
+  return customers.map((customer) => {
+    const tagIds = tagIdsByCustomer.get(customer.id) ?? [];
+    return {
+      ...customer,
+      assignedName: customer.assignedTo
+        ? staffNames.get(customer.assignedTo) ?? undefined
+        : undefined,
+      notes: notesByCustomer.get(customer.id) ?? [],
+      tasks: tasksByCustomer.get(customer.id) ?? [],
+      tags: tagIds
+        .map((tagId) => tagsById.get(tagId))
+        .filter((tag): tag is NonNullable<typeof tag> => Boolean(tag)),
+      interactions: interactionsByCustomer.get(customer.id) ?? [],
+    };
+  });
+}
+
+async function loadCustomerWithCrm(
+  admin: AdminClient,
+  customerId: string,
+): Promise<Customer> {
+  const [customerResult, teamResult] = await Promise.all([
+    admin.from('admin_customers').select('*').eq('id', customerId).maybeSingle(),
+    admin
+      .from('profiles')
+      .select('*')
+      .in('role', ['admin', 'employee']),
+  ]);
+
+  ensureNoError(customerResult.error, 'Failed to load customer.');
+  ensureNoError(teamResult.error, 'Failed to load team members.');
+
+  if (!customerResult.data) {
+    throw new Error('Customer was not found.');
+  }
+
+  const [customer] = await attachCustomerCrmData(
+    admin,
+    [mapCustomerRow(customerResult.data)],
+    (teamResult.data ?? []).map(toTeamMember),
+  );
+
+  return customer;
+}
+
 export async function loadAdminDashboardSnapshot(
   role: AdminRole,
 ): Promise<AdminDashboardSnapshot> {
@@ -126,13 +326,11 @@ export async function loadAdminDashboardSnapshot(
     admin.from('admin_spec_templates').select('*').order('updated_at', { ascending: false }),
     admin.from('site_settings').select('*').eq('id', 'singleton').maybeSingle(),
     admin.from('hero_banners').select('*').order('sort_order', { ascending: true }),
-    role === 'admin'
-      ? admin
-          .from('profiles')
-          .select('*')
-          .in('role', ['admin', 'employee'])
-          .order('updated_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
+    admin
+      .from('profiles')
+      .select('*')
+      .in('role', ['admin', 'employee'])
+      .order('updated_at', { ascending: false }),
   ]);
 
   ensureNoError(productsResult.error, 'Failed to load products.');
@@ -147,6 +345,15 @@ export async function loadAdminDashboardSnapshot(
   ensureNoError(bannersResult.error, 'Failed to load hero banners.');
   ensureNoError(teamResult.error, 'Failed to load team members.');
 
+  const teamMembers =
+    role === 'admin' ? (teamResult.data ?? []).map(toTeamMember) : [];
+  const crmTeamMembers = (teamResult.data ?? []).map(toTeamMember);
+  const customers = await attachCustomerCrmData(
+    admin,
+    (customersResult.data ?? []).map(mapCustomerRow),
+    crmTeamMembers,
+  );
+
   return {
     products: (productsResult.data ?? []).map(mapProductRow),
     categories: (categoriesResult.data ?? []).map(mapCategoryRow),
@@ -158,7 +365,7 @@ export async function loadAdminDashboardSnapshot(
           left.name.localeCompare(right.name),
       ),
     orders: (ordersResult.data ?? []).map(mapOrderRow),
-    customers: (customersResult.data ?? []).map(mapCustomerRow),
+    customers,
     reviews: (reviewsResult.data ?? []).map(mapReviewRow),
     comparisons: (comparisonsResult.data ?? []).map(mapComparisonRow),
     specTemplates: (specTemplatesResult.data ?? []).map(mapSpecTemplateRow),
@@ -166,7 +373,7 @@ export async function loadAdminDashboardSnapshot(
       ? mapSiteSettingsRow(settingsResult.data)
       : defaultSettings,
     heroBanners: (bannersResult.data ?? []).map(mapHeroBannerRow),
-    teamMembers: (teamResult.data ?? []).map(toTeamMember),
+    teamMembers,
   };
 }
 
@@ -415,6 +622,246 @@ export async function saveOrderRecord(order: Order): Promise<Order> {
   await mirrorUserOrder(admin, savedOrder);
 
   return savedOrder;
+}
+
+export async function saveCustomerCrmMutationRecord(
+  mutation: CustomerCrmMutation,
+  actor: {
+    user: { id: string; email?: string | null };
+    profile: Tables['profiles']['Row'];
+    role: AdminRole;
+  },
+): Promise<Customer> {
+  const admin = getAdmin();
+  const actorName = getActorName(actor);
+  const now = new Date().toISOString();
+
+  try {
+    switch (mutation.action) {
+      case 'update-customer': {
+        const update: Tables['admin_customers']['Update'] = {
+          updated_at: now,
+        };
+
+        if (mutation.crmStatus) {
+          update.crm_status = mutation.crmStatus;
+        }
+        if ('assignedTo' in mutation) {
+          update.assigned_to = mutation.assignedTo || null;
+        }
+        if ('nextFollowUpAt' in mutation) {
+          update.next_follow_up_at = mutation.nextFollowUpAt || null;
+        }
+        if (typeof mutation.internalRating === 'number') {
+          update.internal_rating = Math.max(
+            0,
+            Math.min(5, Math.round(mutation.internalRating)),
+          );
+        }
+        if (typeof mutation.isActive === 'boolean') {
+          update.is_active = mutation.isActive;
+        }
+
+        const { error } = await admin
+          .from('admin_customers')
+          .update(update)
+          .eq('id', mutation.customerId);
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'add-note': {
+        const { error } = await admin.from('admin_customer_notes').insert({
+          customer_id: mutation.customerId,
+          body: mutation.body.trim(),
+          created_by: actor.user.id,
+          author_name: actorName,
+        });
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'delete-note': {
+        if (actor.role !== 'admin') {
+          throw new Error('حذف الملاحظات متاح للمدير فقط.');
+        }
+
+        const { error } = await admin
+          .from('admin_customer_notes')
+          .delete()
+          .eq('id', mutation.noteId)
+          .eq('customer_id', mutation.customerId);
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'add-task': {
+        const assignedName = await getStaffNameById(admin, mutation.assignedTo);
+        const { error } = await admin.from('admin_customer_tasks').insert({
+          customer_id: mutation.customerId,
+          title: mutation.title.trim(),
+          description: mutation.description?.trim() || null,
+          due_at: mutation.dueAt || null,
+          priority: mutation.priority ?? 'medium',
+          assigned_to: mutation.assignedTo || null,
+          assigned_name: assignedName,
+          created_by: actor.user.id,
+          created_by_name: actorName,
+        });
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'update-task': {
+        const update: Tables['admin_customer_tasks']['Update'] = {
+          updated_at: now,
+        };
+
+        if (typeof mutation.title === 'string') {
+          update.title = mutation.title.trim();
+        }
+        if (typeof mutation.description === 'string') {
+          update.description = mutation.description.trim() || null;
+        }
+        if ('dueAt' in mutation) {
+          update.due_at = mutation.dueAt || null;
+        }
+        if (mutation.status) {
+          update.status = mutation.status;
+          update.completed_at = mutation.status === 'done' ? now : null;
+        }
+        if (mutation.priority) {
+          update.priority = mutation.priority;
+        }
+        if ('assignedTo' in mutation) {
+          update.assigned_to = mutation.assignedTo || null;
+          update.assigned_name = await getStaffNameById(admin, mutation.assignedTo);
+        }
+
+        const { error } = await admin
+          .from('admin_customer_tasks')
+          .update(update)
+          .eq('id', mutation.taskId)
+          .eq('customer_id', mutation.customerId);
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'delete-task': {
+        if (actor.role !== 'admin') {
+          throw new Error('حذف مهام المتابعة متاح للمدير فقط.');
+        }
+
+        const { error } = await admin
+          .from('admin_customer_tasks')
+          .delete()
+          .eq('id', mutation.taskId)
+          .eq('customer_id', mutation.customerId);
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'add-interaction': {
+        const occurredAt = mutation.occurredAt || now;
+        const { error } = await admin.from('admin_customer_interactions').insert({
+          customer_id: mutation.customerId,
+          type: mutation.type,
+          summary: mutation.summary.trim(),
+          occurred_at: occurredAt,
+          created_by: actor.user.id,
+          created_by_name: actorName,
+        });
+        ensureCrmSchema(error);
+
+        const update = await admin
+          .from('admin_customers')
+          .update({
+            last_contact_at: occurredAt,
+            updated_at: now,
+          })
+          .eq('id', mutation.customerId);
+        ensureCrmSchema(update.error);
+        break;
+      }
+
+      case 'delete-interaction': {
+        if (actor.role !== 'admin') {
+          throw new Error('حذف سجل التواصل متاح للمدير فقط.');
+        }
+
+        const { error } = await admin
+          .from('admin_customer_interactions')
+          .delete()
+          .eq('id', mutation.interactionId)
+          .eq('customer_id', mutation.customerId);
+        ensureCrmSchema(error);
+        break;
+      }
+
+      case 'add-tag': {
+        const tagName = mutation.name.trim();
+        if (!tagName) {
+          throw new Error('اسم الوسم مطلوب.');
+        }
+
+        const tagResult = await admin
+          .from('admin_customer_tags')
+          .upsert(
+            {
+              name: tagName,
+              color: mutation.color || '#3b82f6',
+              created_by: actor.user.id,
+            },
+            { onConflict: 'name' },
+          )
+          .select('*')
+          .single();
+        ensureCrmSchema(tagResult.error);
+
+        const tagId = requireData(tagResult.data, 'Failed to load saved tag.').id;
+        const linkResult = await admin
+          .from('admin_customer_tag_links')
+          .upsert(
+            {
+              customer_id: mutation.customerId,
+              tag_id: tagId,
+            },
+            { onConflict: 'customer_id,tag_id' },
+          );
+        ensureCrmSchema(linkResult.error);
+        break;
+      }
+
+      case 'remove-tag': {
+        if (actor.role !== 'admin') {
+          throw new Error('إزالة الوسوم متاحة للمدير فقط.');
+        }
+
+        const { error } = await admin
+          .from('admin_customer_tag_links')
+          .delete()
+          .eq('customer_id', mutation.customerId)
+          .eq('tag_id', mutation.tagId);
+        ensureCrmSchema(error);
+        break;
+      }
+    }
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      isMissingCrmSchemaError(error as { message?: string | null; code?: string | null })
+    ) {
+      throw new Error(
+        'منظومة CRM تحتاج تفعيل جداولها في Supabase أولاً. افتح SQL Editor ونفّذ ملف supabase/migrations/0004_customer_crm.sql ثم حدّث الصفحة.',
+      );
+    }
+
+    throw error;
+  }
+
+  return loadCustomerWithCrm(admin, mutation.customerId);
 }
 
 export async function updateTeamMemberRoleRecord(input: {

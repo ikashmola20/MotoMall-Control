@@ -113,16 +113,18 @@ export default function ProductsPage() {
       return;
     }
 
-    setEditingProduct(
-      draft.editingProductId
-        ? products.find((item) => item.id === draft.editingProductId) ?? null
-        : null,
-    );
-    setForm({ ...INITIAL_PRODUCT_FORM, ...draft.form });
-    setFormImages(draft.formImages);
-    setFormSpecTemplateId(draft.formSpecTemplateId);
-    setFormSpecs(draft.formSpecs);
-    setShowForm(true);
+    queueMicrotask(() => {
+      setEditingProduct(
+        draft.editingProductId
+          ? products.find((item) => item.id === draft.editingProductId) ?? null
+          : null,
+      );
+      setForm({ ...INITIAL_PRODUCT_FORM, ...draft.form });
+      setFormImages(draft.formImages);
+      setFormSpecTemplateId(draft.formSpecTemplateId);
+      setFormSpecs(draft.formSpecs);
+      setShowForm(true);
+    });
   }, [hydrated, products]);
 
   useEffect(() => {

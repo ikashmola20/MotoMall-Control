@@ -4,6 +4,7 @@ import type {
   Brand,
   Category,
   Comparison,
+  Customer,
   HeroBanner,
   Order,
   Product,
@@ -14,6 +15,7 @@ import type {
 } from '@/types/admin';
 import type {
   AdminDashboardSnapshot,
+  CustomerCrmMutation,
   TeamRoleMutation,
 } from '@/lib/admin-contract';
 import { getSupabaseBrowserClient } from './client';
@@ -171,6 +173,15 @@ export async function saveOrder(order: Order): Promise<Order> {
   return requestAdminRoute<Order>('/api/admin/orders', {
     method: 'POST',
     body: JSON.stringify(order),
+  });
+}
+
+export async function saveCustomerCrm(
+  mutation: CustomerCrmMutation,
+): Promise<Customer> {
+  return requestAdminRoute<Customer>('/api/admin/crm', {
+    method: 'POST',
+    body: JSON.stringify(mutation),
   });
 }
 

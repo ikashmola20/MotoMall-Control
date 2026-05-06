@@ -151,6 +151,61 @@ export interface Order {
 
 // ── Customers ───────────────────────────────
 
+export type CustomerCrmStatus = 'new' | 'active' | 'vip' | 'at_risk' | 'inactive';
+
+export type CustomerTaskStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
+
+export type CustomerTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type CustomerInteractionType = 'call' | 'whatsapp' | 'visit' | 'email' | 'note';
+
+export interface CustomerTag {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CustomerNote {
+  id: string;
+  customerId: string;
+  body: string;
+  createdBy?: string;
+  authorName?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CustomerTask {
+  id: string;
+  customerId: string;
+  title: string;
+  description?: string;
+  dueAt?: string;
+  status: CustomerTaskStatus;
+  priority: CustomerTaskPriority;
+  assignedTo?: string;
+  assignedName?: string;
+  createdBy?: string;
+  createdByName?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CustomerInteraction {
+  id: string;
+  customerId: string;
+  type: CustomerInteractionType;
+  summary: string;
+  occurredAt: string;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -164,6 +219,16 @@ export interface Customer {
   isActive: boolean;
   lastOrderAt?: string;
   updatedAt?: string;
+  crmStatus?: CustomerCrmStatus;
+  assignedTo?: string;
+  assignedName?: string;
+  lastContactAt?: string;
+  nextFollowUpAt?: string;
+  internalRating?: number;
+  tags?: CustomerTag[];
+  notes?: CustomerNote[];
+  tasks?: CustomerTask[];
+  interactions?: CustomerInteraction[];
 }
 
 // ── Reviews ─────────────────────────────────

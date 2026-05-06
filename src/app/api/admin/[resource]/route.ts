@@ -10,7 +10,7 @@ import type {
   SiteSettings,
   SpecTemplate,
 } from '@/types/admin';
-import type { TeamRoleMutation } from '@/lib/admin-contract';
+import type { CustomerCrmMutation, TeamRoleMutation } from '@/lib/admin-contract';
 import { authorizeAdminRequest, AdminAccessError } from '@/lib/supabase/admin-auth';
 import {
   deleteBrandRecord,
@@ -23,6 +23,7 @@ import {
   saveBrandRecord,
   saveCategoryRecord,
   saveComparisonRecord,
+  saveCustomerCrmMutationRecord,
   saveHeroBannerRecord,
   saveOrderRecord,
   saveProductRecord,
@@ -97,6 +98,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       case 'orders':
         return NextResponse.json(
           await saveOrderRecord(await readJson<Order>(request)),
+        );
+      case 'crm':
+        return NextResponse.json(
+          await saveCustomerCrmMutationRecord(
+            await readJson<CustomerCrmMutation>(request),
+            {
+              user: access.user,
+              profile: access.profile,
+              role: access.role,
+            },
+          ),
         );
       case 'team': {
         const mutation = await readJson<TeamRoleMutation>(request);

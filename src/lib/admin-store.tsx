@@ -17,6 +17,10 @@ import type {
   Category,
   Comparison,
   Customer,
+  CustomerCrmStatus,
+  CustomerInteractionType,
+  CustomerTaskPriority,
+  CustomerTaskStatus,
   DailySales,
   Expense,
   HeroBanner,
@@ -55,6 +59,7 @@ import {
   loadAdminUser,
   saveBrand,
   saveCategory,
+  saveCustomerCrm,
   saveComparison,
   saveHeroBanner,
   saveOrder,
@@ -107,6 +112,52 @@ interface AdminActions {
   addBrand: (brand: Brand) => void;
   updateBrand: (brand: Brand) => void;
   deleteBrand: (id: string) => void;
+  updateCustomerCrm: (
+    customerId: string,
+    patch: {
+      crmStatus?: CustomerCrmStatus;
+      assignedTo?: string | null;
+      nextFollowUpAt?: string | null;
+      internalRating?: number;
+      isActive?: boolean;
+    },
+  ) => void;
+  addCustomerNote: (customerId: string, body: string) => void;
+  deleteCustomerNote: (customerId: string, noteId: string) => void;
+  addCustomerTask: (
+    customerId: string,
+    input: {
+      title: string;
+      description?: string;
+      dueAt?: string;
+      priority?: CustomerTaskPriority;
+      assignedTo?: string | null;
+    },
+  ) => void;
+  updateCustomerTask: (
+    customerId: string,
+    taskId: string,
+    patch: {
+      title?: string;
+      description?: string;
+      dueAt?: string | null;
+      status?: CustomerTaskStatus;
+      priority?: CustomerTaskPriority;
+      assignedTo?: string | null;
+    },
+  ) => void;
+  deleteCustomerTask: (customerId: string, taskId: string) => void;
+  addCustomerInteraction: (
+    customerId: string,
+    input: {
+      type: CustomerInteractionType;
+      summary: string;
+      occurredAt?: string;
+    },
+  ) => void;
+  deleteCustomerInteraction: (customerId: string, interactionId: string) => void;
+  addCustomerTag: (customerId: string, name: string, color?: string) => void;
+  removeCustomerTag: (customerId: string, tagId: string) => void;
   updateReviewStatus: (reviewId: string, status: Review['status']) => void;
   deleteReview: (id: string) => void;
   addComparison: (comparison: Comparison) => void;
@@ -653,6 +704,224 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     [runMutation],
   );
 
+  const updateCustomerCrm = useCallback(
+    (
+      customerId: string,
+      patch: {
+        crmStatus?: CustomerCrmStatus;
+        assignedTo?: string | null;
+        nextFollowUpAt?: string | null;
+        internalRating?: number;
+        isActive?: boolean;
+      },
+    ) => {
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'update-customer',
+            customerId,
+            ...patch,
+          }),
+        'فشل تحديث بيانات CRM',
+        'تم تحديث بيانات العميل بنجاح',
+      );
+    },
+    [runMutation],
+  );
+
+  const addCustomerNote = useCallback(
+    (customerId: string, body: string) => {
+      if (!body.trim()) {
+        showToast('اكتب الملاحظة أولاً.');
+        return;
+      }
+
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'add-note',
+            customerId,
+            body,
+          }),
+        'فشل حفظ الملاحظة',
+        'تمت إضافة الملاحظة',
+      );
+    },
+    [runMutation, showToast],
+  );
+
+  const deleteCustomerNote = useCallback(
+    (customerId: string, noteId: string) => {
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'delete-note',
+            customerId,
+            noteId,
+          }),
+        'فشل حذف الملاحظة',
+        'تم حذف الملاحظة',
+      );
+    },
+    [runMutation],
+  );
+
+  const addCustomerTask = useCallback(
+    (
+      customerId: string,
+      input: {
+        title: string;
+        description?: string;
+        dueAt?: string;
+        priority?: CustomerTaskPriority;
+        assignedTo?: string | null;
+      },
+    ) => {
+      if (!input.title.trim()) {
+        showToast('عنوان المهمة مطلوب.');
+        return;
+      }
+
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'add-task',
+            customerId,
+            ...input,
+          }),
+        'فشل حفظ مهمة المتابعة',
+        'تمت إضافة مهمة المتابعة',
+      );
+    },
+    [runMutation, showToast],
+  );
+
+  const updateCustomerTask = useCallback(
+    (
+      customerId: string,
+      taskId: string,
+      patch: {
+        title?: string;
+        description?: string;
+        dueAt?: string | null;
+        status?: CustomerTaskStatus;
+        priority?: CustomerTaskPriority;
+        assignedTo?: string | null;
+      },
+    ) => {
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'update-task',
+            customerId,
+            taskId,
+            ...patch,
+          }),
+        'فشل تحديث مهمة المتابعة',
+        'تم تحديث مهمة المتابعة',
+      );
+    },
+    [runMutation],
+  );
+
+  const deleteCustomerTask = useCallback(
+    (customerId: string, taskId: string) => {
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'delete-task',
+            customerId,
+            taskId,
+          }),
+        'فشل حذف مهمة المتابعة',
+        'تم حذف مهمة المتابعة',
+      );
+    },
+    [runMutation],
+  );
+
+  const addCustomerInteraction = useCallback(
+    (
+      customerId: string,
+      input: {
+        type: CustomerInteractionType;
+        summary: string;
+        occurredAt?: string;
+      },
+    ) => {
+      if (!input.summary.trim()) {
+        showToast('اكتب ملخص التواصل أولاً.');
+        return;
+      }
+
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'add-interaction',
+            customerId,
+            ...input,
+          }),
+        'فشل حفظ سجل التواصل',
+        'تم تسجيل التواصل',
+      );
+    },
+    [runMutation, showToast],
+  );
+
+  const deleteCustomerInteraction = useCallback(
+    (customerId: string, interactionId: string) => {
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'delete-interaction',
+            customerId,
+            interactionId,
+          }),
+        'فشل حذف سجل التواصل',
+        'تم حذف سجل التواصل',
+      );
+    },
+    [runMutation],
+  );
+
+  const addCustomerTag = useCallback(
+    (customerId: string, name: string, color?: string) => {
+      if (!name.trim()) {
+        showToast('اسم الوسم مطلوب.');
+        return;
+      }
+
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'add-tag',
+            customerId,
+            name,
+            color,
+          }),
+        'فشل إضافة الوسم',
+        'تمت إضافة الوسم',
+      );
+    },
+    [runMutation, showToast],
+  );
+
+  const removeCustomerTag = useCallback(
+    (customerId: string, tagId: string) => {
+      void runMutation(
+        () =>
+          saveCustomerCrm({
+            action: 'remove-tag',
+            customerId,
+            tagId,
+          }),
+        'فشل إزالة الوسم',
+        'تمت إزالة الوسم',
+      );
+    },
+    [runMutation],
+  );
+
   const updateReviewStatus = useCallback(
     (reviewId: string, status: Review['status']) => {
       const review = stateRef.current.reviews.find((item) => item.id === reviewId);
@@ -932,6 +1201,16 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       addBrand,
       updateBrand,
       deleteBrand: deleteBrandAction,
+      updateCustomerCrm,
+      addCustomerNote,
+      deleteCustomerNote,
+      addCustomerTask,
+      updateCustomerTask,
+      deleteCustomerTask,
+      addCustomerInteraction,
+      deleteCustomerInteraction,
+      addCustomerTag,
+      removeCustomerTag,
       updateReviewStatus,
       deleteReview,
       addComparison,
@@ -970,6 +1249,16 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       addBrand,
       updateBrand,
       deleteBrandAction,
+      updateCustomerCrm,
+      addCustomerNote,
+      deleteCustomerNote,
+      addCustomerTask,
+      updateCustomerTask,
+      deleteCustomerTask,
+      addCustomerInteraction,
+      deleteCustomerInteraction,
+      addCustomerTag,
+      removeCustomerTag,
       updateReviewStatus,
       deleteReview,
       addComparison,
